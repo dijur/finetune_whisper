@@ -1,35 +1,34 @@
-# Fine-Tuning Whisper for Low-Resource Languages Using Synthetic Speech Data
+# Fine-Tuning Whisper for Tajik Using Synthetic Speech Data
 
-This is a comprehensive toolkit designed to improve Automatic Speech Recognition (ASR) for low-resource languages through synthetic data generation and model fine-tuning. It addresses the challenge of limited audio data availability by leveraging text-to-speech technologies and providing robust evaluation metrics.
+This toolkit enables automatic speech recognition (ASR) for low-resource languages by generating synthetic speech data and fine-tuning Whisper. The approach is validated on Tajik, showing that synthetic data and augmentation can dramatically improve ASR performance, even surpassing much larger baseline models.
 
 ---
 
 ## Data
 
-We use the **[Tajik Corpus](https://huggingface.co/datasets/muhtasham/tajik-corpus)** hosted on HuggingFace as the main text dataset. From this corpus, text samples are selected and converted into synthetic speech using the `facebook/mms-tts-tgk` TTS model.
+We use the **Tajik Corpus** as the main text source. Sentences are selected for vocabulary and syntactic diversity, excluding those with non-standard orthography or excessive length.
 
-**Notebook**: `notebooks/1_synthetic_data_generation.ipynb` handles the data preparation.
+Synthetic speech is generated using the `facebook/mms-tts-tgk` TTS model at 16 kHz. The process is automated with a custom `SyntheticDataGenerator` class, which:
 
-### Synthetic Data Generation
+* Randomly samples sentences from the corpus
+* Converts text to audio (WAV)
+* Applies augmentations (see below)
+* Logs metadata (audio path, text, duration) in a JSONL file
 
-Synthetic audio is generated using a custom class `SyntheticDataGenerator` that:
-- Loads a TTS model (`facebook/mms-tts-tgk`)
-- Samples random text entries from the corpus
-- Converts text into audio
-- Applies augmentations
-- Stores audio files and logs metadata
+**Quality control**: Random samples of generated audio are perceptually checked and compared to real Tajik recordings.
 
-#### Output Format
+---
 
-- **Audio files**: Stored as `synthetic_000001.wav`, `synthetic_000002.wav`, etc.
-- **Metadata**: JSON lines file (`metadata.jsonl`) including:
-  - `audio_path`
-  - `text`
-  - `duration`
+## Output Format
 
-### Audio Augmentation Techniques
+* **Audio files**: `synthetic_000001.wav`, `synthetic_000002.wav`, etc.
+* **Metadata**: `metadata.jsonl` with `audio_path`, `text`, `duration`
 
-Enabled by configuration:
+---
+
+## Audio Augmentation
+
+Augmentation is crucial for bridging the gap between synthetic and real speech. The following are applied probabilistically:
 
 ```json
 "augmentation": {
@@ -40,53 +39,122 @@ Enabled by configuration:
 }
 ```
 
-Includes:
-- Gaussian noise addition
-- Speed perturbation
-- Pitch shifting
+Techniques:
 
-These help diversify synthetic audio and simulate more realistic conditions.
+* **Gaussian noise** (Ko et al., 2015)
+* **Speed perturbation** (Ko et al., 2015; Park et al., 2019)
+* **Pitch shifting** (Cui et al., 2015)
+
+These simulate real-world variability and increase model robustness.
 
 ---
 
 ## Fine-Tuning Whisper
 
-Once synthetic data is prepared, we fine-tune OpenAI’s Whisper model using the notebook:
+Fine-tuning is performed on the **Whisper-small** model using Hugging Face Transformers in Google Colab Pro. The pipeline includes:
 
-**Notebook**: `notebooks/2_fine_tune_whisper.ipynb`
+* **Feature extraction**: Audio resampled to 16 kHz, converted to log-Mel spectrograms
+* **Tokenization**: Using Whisper tokenizer
+* **Training**: Cross-entropy loss, early stopping on validation loss
 
-This notebook is adapted from the HuggingFace tutorial:  
-👉 [Fine-tune Whisper for Multilingual ASR](https://huggingface.co/blog/fine-tune-whisper)
+**Training setup:**
 
-All experiments were conducted using **Google Colab** with GPU support.
+* Batch size: `16`
+* Learning rate: `2e-5`
+* Epochs: `10`
+* Optimizer: `Adam`
+
+All code, environment details, and hyperparameters are provided for full reproducibility.
+
+**Notebook**: `notebooks/2_fine_tune_whisper.ipynb` (adapted from Hugging Face’s tutorial)
 
 ---
 
 ## Evaluation
 
-To assess model performance:
+100 real Tajik sentences were manually recorded (50 male, 50 female speakers), covering a range of vocabulary, sentence lengths, and environments (indoors, outdoors, with noise).
 
-- We manually recorded **100 real Tajik sentences**
-- Evaluation will be conducted comparing:
-  - Baseline Whisper models: `small`, `medium`, `large`
-  - Our **fine-tuned Whisper model**
+### Models compared:
 
-**Metrics** (TBD): Word Error Rate (WER), Character Error Rate (CER), etc.
+* Whisper-small (baseline)
+* Whisper-medium (baseline)
+* Whisper-large (baseline)
+* Fine-tuned Whisper-small (ours)
+
+### Metrics:
+
+* **Word Error Rate (WER)**
+* **Character Error Rate (CER)**
+
+### Results:
+
+| Model          | WER (%) | CER (%) |
+| -------------- | ------- | ------- |
+| Fine-tuned     | 55.45   | 26.86   |
+| Whisper-Small  | 101.46  | 44.52   |
+| Whisper-Medium | 95.56   | 40.41   |
+| Whisper-Large  | 94.23   | 43.23   |
+
+### Gender Analysis:
+
+* Fine-tuned model:
+
+  * WER: 40.9% (female), 69.7% (male)
+  * CER: 10.4% (female), 43.6% (male)
+* All models performed better on female speakers, likely due to TTS voice characteristics.
+
+### Qualitative Analysis:
+
+* Fine-tuned model produces more intelligible transcriptions, but struggles with:
+
+  * Word boundaries
+  * Rare vocabulary
+  * Morphology (especially for male speakers and complex sentences)
+* Baseline models often fail to produce usable transcriptions, sometimes showing cross-lingual interference (e.g., Persian-like outputs)
 
 ---
 
-## Future Improvements
+## Data Preparation
 
-- [ ] **Expand synthetic dataset** with other TTS models (e.g., OpenAI TTS, Coqui)
-- [ ] **Optimize training hyperparameters** (batch size, learning rate, etc.)
-- [ ] **Gather more real evaluation data**, including diverse speakers
-- [ ] 
+Before running notebooks, manually download and place data:
+
+### Training (`2_fine_tune_whisper.ipynb`):
+
+* `Colab Outputs` folder
+* `metadata.jsonl`
+* `audio/`
+
+### Evaluation (`4_evaluate_and_compare.ipynb`):
+
+* `holdout_metadata.jsonl` & folder
+* `holdout_audio/` folder
+
+> **Note:** Notebooks do not download or mount Google Drive automatically.
+
+---
+
+## Limitations
+
+* Evaluation set is small (100 sentences) and may not capture full diversity (dialect, age, environment)
+* Reliance on a single TTS model may introduce bias (e.g., gender)
+* Synthetic data, while effective, cannot fully substitute for real speech
+* Error rates, though improved, remain high for real-world deployment
+
+---
+
+## Future Directions
+
+* Expand synthetic dataset with more TTS voices (different genders, ages, accents) and models (e.g., OpenAI TTS, Coqui)
+* Refine text selection to better cover rare words and morphological variants
+* Incorporate even small amounts of real speech for hybrid training
+* Expand evaluation set for more robust assessment
+* Explore advanced augmentations (reverberation, real background noise, adversarial perturbations)
+* Apply pipeline to other low-resource languages
 
 ---
 
 ## Acknowledgements
 
-- HuggingFace TTS & Whisper resources
-- [Tajik Corpus](https://huggingface.co/datasets/muhtasham/tajik-corpus)
-- MMS-TTS by Facebook AI
-
+* Hugging Face TTS & Whisper resources
+* Tajik Corpus
+* MMS-TTS by Facebook AI
