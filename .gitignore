@@ -89,3 +89,4 @@ models
 
 # Mypy cache
 .mypy_cache/
+data/final_filtered_newest.txt
