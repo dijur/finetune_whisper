@@ -119,17 +119,17 @@ All code, environment details, and hyperparameters are provided for full reprodu
 Before running notebooks, manually download and place data:
 
 ### Training (`2_fine_tune_whisper.ipynb`):
+https://drive.google.com/drive/folders/1GDWR8TRK9g2iQFhZrn8EgYIYrNGJbKyB?usp=drive_link
 
 * `Colab Outputs` folder
 * `metadata.jsonl`
 * `audio/`
 
 ### Evaluation (`4_evaluate_and_compare.ipynb`):
+https://drive.google.com/drive/folders/1B1EJoQw5awWUtUI3lmr3bPHS6THWQJD_?usp=drive_link
 
 * `holdout_metadata.jsonl` & folder
 * `holdout_audio/` folder
-
-> **Note:** Notebooks do not download or mount Google Drive automatically.
 
 ---
 
